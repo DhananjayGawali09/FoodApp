@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../js/script.js"></script>
+  <style>
+    body {
+      background-color: #f9fafb;
+    }
+
+    h2#welcomeMessage {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+    }
+
+    .stats-card {
+      flex: 1 1 calc(25% - 1rem);
+      min-width: 200px;
+      background-color: #ffffff;
+      border: 1px solid #dee2e6;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+	.stats-card:nth-child(odd) {
+      border-left-color: #ced4da;
+    }
+
+    .stats-card h5 {
+      font-size: 1rem;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+      align-items: center;
+    }
+
+    .stats-card p {
+      font-size: 1.5rem;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .stats-card p[title] {
+      cursor: help;
+    }
+  </style>
+</head>
+
+<body class="container my-5">
+  <h2 id="welcomeMessage"></h2>
+  <p class="text-muted">Here’s a quick overview of today’s activity.</p>
+
+
+  <div class="stats-row mb-4">
+    <div class="stats-card">
+      <h5>Total Orders</h5>
+      <p id="totalOrders">0</p>
+    </div>
+    <div class="stats-card">
+      <h5>Orders Today</h5>
+      <p id="ordersToday">0</p>
+    </div>
+    <div class="stats-card">
+      <h5>Total Revenue</h5>
+      <p id="totalRevenue">₹0</p>
+    </div>
+    <div class="stats-card">
+      <h5>Revenue Today</h5>
+      <p id="revenueToday">₹0</p>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <h4 class="fw-bold mb-3">Quick Actions</h4>
+    <div class="d-flex flex-wrap gap-3">
+      <a onclick="loadPage('./manage-food-items.html')" class="btn btn-outline-primary">
+        ➕ Add New Menu Item
+      </a>
+      <a onclick="loadPage('./owner-profile.html')" class="btn btn-outline-warning">
+        ✏️ Edit Restaurant Details
+      </a>
+      <a onclick="loadPage('./restaurant-report.html')" class="btn btn-outline-info">
+        🔍 View Detailed Reports
+      </a>
+    </div>
+  </div>
+  <!-- <div class="mb-4">
+    <h4 class="fw-bold mb-3">Customer Report</h4>
+    <canvas id="customerChart" height="100"></canvas>
+  </div> -->
+
+  <div class="mb-4">
+    <h4 class="fw-bold mb-3">Top Customer</h4>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Customer ID</th>
+          <th>Customer Name</th>
+          <th>Total Orders</th>
+          <th>Total Spend</th>
+          <th>Last Order Date</th>
+        </tr>
+      </thead>
+      <tbody id="topCustomersTable">
+        <!-- Orders will be populated here -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mb-4">
+    <h4 class="fw-bold mb-3">Recent Orders</h4>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Customer </th>
+          <th>Order Date</th>
+          <th>Total Amount</th>
+        </tr>
+      </thead>
+      <tbody id="recentOrdersTable">
+        <!-- Orders will be populated here -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mb-4">
+    <h4 class="fw-bold mb-3">Recently Added Item</h4>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Item ID</th>
+          <th>Item Name</th>
+          <th>Item Category</th>
+          <th>Item Price</th>
+        </tr>
+      </thead>
+      <tbody id="recentAddedItemTable">
+        <!-- Orders will be populated here -->
+      </tbody>
+    </table>
+  </div>
+	<script src="../js/script.js"></script>
+  <script>
+ //  apiUrl = "http://localhost:8080/api"; // No trailing slash
+
+   welcomeMessage = document.getElementById("welcomeMessage");
+   ordersToday = document.getElementById("ordersToday");
+   totalOrders = document.getElementById("totalOrders");
+   revenueToday = document.getElementById("revenueToday");
+   totalRevenue = document.getElementById("totalRevenue");
+   //currentOwnerId = localStorage.getItem("currentOwnerId");
+   currentOwnerId = getUserId();
+   console.log("user id:",getUserId())
+
+   today = new Date();
+   formattedDate = today.toISOString().split('T')[0];
+
+  // Utility: Safely set innerHTML if element exists
+  function safeSetInnerHTML(el, value) {
+    if (el) el.innerHTML = value;
+  }
+
+  // Utility: Get table body by id, or return null
+  function getTableBody(id) {
+    return document.getElementById(id) || null;
+  }
+
+  async function fetchRestaurant() {
+    try {
+       res = await fetch(`${apiUrl}/restaurants/owner/${currentOwnerId}`, {
+           method: "GET",
+           headers: {
+             "Content-Type": "application/json",
+             "Authorization": getAuthorization()
+           },
+         });
+      if (!res.ok) throw new Error("Restaurant not found");
+      return await res.json();
+    } catch (error) {
+      console.error("Error fetching restaurant:", error);
+      safeSetInnerHTML(welcomeMessage, "No restaurant found for this owner.");
+      throw error;
+    }
+  }
+
+  async function countOrders() {
+    try {
+       restaurant = await fetchRestaurant();
+       id = getCurrentRestaurantId();
+       console.log("id:", id);
+      safeSetInnerHTML(welcomeMessage, `Welcome, ${restaurant.name}👋`);
+
+      let countRes = await fetch(`${apiUrl}/orders/restaurant/count/${id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        });
+      let count = countRes.ok ? await countRes.text() : "0";
+      safeSetInnerHTML(totalOrders, `${count}`);
+
+      let todayOrdersRes = await fetch(`${apiUrl}/orders/restaurant/count/${id}?date=${formattedDate}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        });
+      let todayCount = todayOrdersRes.ok ? await todayOrdersRes.text() : "0";
+      safeSetInnerHTML(ordersToday, `${todayCount}`);
+    } catch (error) {
+      safeSetInnerHTML(totalOrders, "0");
+      safeSetInnerHTML(ordersToday, "0");
+    }
+  }
+  countOrders();
+
+  async function calculateRevenue() {
+    try {
+       restaurant = await fetchRestaurant();
+       id = getCurrentRestaurantId();
+
+      let revenueRes = await fetch(`${apiUrl}/orders/restaurant/revenue/${id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        });
+      let revenue = revenueRes.ok ? await revenueRes.text() : "0";
+      safeSetInnerHTML(totalRevenue, `₹${revenue}`);
+
+      let todayRevenueRes = await fetch(`${apiUrl}/orders/restaurant/revenue/${id}?date=${formattedDate}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        });
+      let todayRevenue = todayRevenueRes.ok ? await todayRevenueRes.text() : "0";
+      safeSetInnerHTML(revenueToday, `₹${todayRevenue || 0}`);
+    } catch (error) {
+      safeSetInnerHTML(totalRevenue, "₹0");
+      safeSetInnerHTML(revenueToday, "₹0");
+    }
+  }
+  calculateRevenue();
+
+  async function renderRecentOrders() {
+    try {
+       restaurant = await fetchRestaurant();
+       id = getCurrentRestaurantId();
+
+      let recentOrdersRes = await fetch(`${apiUrl}/orders/detail/restaurant/${id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        })
+      let recentOrdersData = [];
+      if (recentOrdersRes.ok) {
+        recentOrdersData = await recentOrdersRes.json();
+      }
+      let limitedOrders = Array.isArray(recentOrdersData) ? recentOrdersData.slice(0, 3) : [];
+
+       tableBody = getTableBody("recentOrdersTable");
+      if (!tableBody) return;
+      tableBody.innerHTML = "";
+
+      if (limitedOrders.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No recent orders</td></tr>`;
+      } else {
+        limitedOrders.forEach(order => {
+          tableBody.innerHTML += `
+            <tr>
+              <td>${order.orderID ?? ""}</td>
+              <td>${order.customerName ?? ""}</td>
+              <td>${order.orderDate ?? ""}</td>
+              <td>₹${order.totalAmount ?? ""}</td>
+            </tr>
+          `;
+        });
+      }
+    } catch (error) {
+       tableBody = getTableBody("recentOrdersTable");
+      if (tableBody) tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error loading orders</td></tr>`;
+    }
+  }
+  renderRecentOrders();
+
+  async function renderRecentFoodItems() {
+    try {
+       restaurant = await fetchRestaurant();
+       id = getCurrentRestaurantId();
+console.log()
+      let res = await fetch(`${apiUrl}/fooditems/recent/${id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        })
+      let fooditems = [];
+      if (res.ok) {
+        fooditems = await res.json();
+      }
+       tbody = getTableBody("recentAddedItemTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (!Array.isArray(fooditems) || fooditems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No recent food items</td></tr>`;
+      } else {
+        fooditems.forEach(fooditem => {
+           row = document.createElement("tr");
+          row.innerHTML = `<td>${fooditem.id ?? ""}</td>
+                           <td>${fooditem.name ?? ""}</td>
+                           <td>${fooditem.category ?? ""}</td>
+                           <td>${fooditem.price ?? ""}</td>`;
+          tbody.appendChild(row);
+        });
+      }
+    } catch (error) {
+       tbody = getTableBody("recentAddedItemTable");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error loading food items</td></tr>`;
+    }
+  }
+  renderRecentFoodItems();
+
+  async function renderTopCustomers() {
+    try {
+       restaurant = await fetchRestaurant();
+       id = getCurrentRestaurantId();
+
+      let res = await fetch(`${apiUrl}/restaurants/customers/details/${id}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": getAuthorization()
+          },
+        });
+      let customers = [];
+      if (res.ok) {
+        customers = await res.json();
+      }
+       tbody = getTableBody("topCustomersTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (!Array.isArray(customers) || customers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No customer data</td></tr>`;
+      } else {
+        customers.forEach(customer => {
+           row = document.createElement("tr");
+          row.innerHTML = `<td>${customer[0] ?? ""}</td>
+                           <td>${customer[1] ?? ""}</td>
+                           <td>${customer[2] ?? ""}</td>
+                           <td>${customer[3] ?? ""}</td>
+                           <td>${customer[4] ?? ""}</td>`;
+          tbody.appendChild(row);
+        });
+      }
+    } catch (error) {
+       tbody = getTableBody("topCustomersTable");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error loading customers</td></tr>`;
+    }
+  }
+  renderTopCustomers();
+
+  </script>
+</body>
+
+</html>
