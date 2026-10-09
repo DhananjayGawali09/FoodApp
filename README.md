@@ -32,7 +32,7 @@ A user-friendly food ordering application designed to streamline the process of 
 
 1. **Clone the Repository**:
    ```bash
-   git clone --branch food-app-v1 https://github.com/nikhil-waghmode/food-app.git
+   git clone --branch food-app-v1 https://github.com/DhananjayGawali09/FoodApp.git
    ```
 
 2. **Navigate to the Project Directory**:
@@ -134,4 +134,4 @@ Contributions are welcome! Please follow these steps:
 
 ## Contact
 
-For any inquiries or feedback, please reach out to [nick13waghmode@gmail.com].
+For any inquiries or feedback, please reach out to [dngawali9999@gmail.com].
